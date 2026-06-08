@@ -1,0 +1,132 @@
+import requests
+import json
+import time
+import os
+import pandas as pd
+from datetime import datetime
+
+# --- CONFIGURATION ---
+MY_API_KEY = "INSERT API KEY HERE"
+CLIENT_ID = "INSERT CLIENT ID HERE"
+MASTER_DATA_FILE = "tbc_anniversary_market_history.csv"
+REGION_ID = 26 # Anniversary EU Region
+
+AUCTION_HOUSES = {
+    559: ("Thunderstrike", "Alliance"),
+    560: ("Spineshatter", "Horde"),
+    561: ("Spineshatter", "Alliance"),
+    562: ("Spineshatter", "Horde")
+}
+
+def get_token():
+    url = "https://auth.tradeskillmaster.com/oauth2/token"
+    payload = {
+        "client_id": CLIENT_ID,
+        "grant_type": "api_token",
+        "scope": "app:realm-api app:pricing-api",
+        "token": MY_API_KEY
+    }
+    try:
+        r = requests.post(url, json=payload)
+        r.raise_for_status()
+        return r.json().get("access_token")
+    except Exception as e:
+        print(f"Auth Error: {e}")
+        return None
+
+def scrape_region_data(token):
+    """Fetches the regional benchmarks for the whole anniversary region."""
+    headers = {"Authorization": f"Bearer {token}", "User-Agent": "TSM-ANN-Project/1.0"}
+    url = f"https://pricing-api.tradeskillmaster.com/region/{REGION_ID}"
+    
+    print(f"Fetching Regional Benchmarks (Region {REGION_ID})...")
+    try:
+        resp = requests.get(url, headers=headers)
+        if resp.status_code == 200:
+            return resp.json()
+        print(f"Region Fetch Failed: {resp.status_code}")
+        return None
+    except Exception as e:
+        print(f"Region Connection Error: {e}")
+        return None
+
+def scrape_auction_house(token, auction_house_id, realm, faction):
+    headers = {"Authorization": f"Bearer {token}", "User-Agent": "TSM-ANN-Project/1.0"}
+    url = f"https://pricing-api.tradeskillmaster.com/ah/{auction_house_id}"
+
+    print(f"Requesting data for {realm} ({faction}) AH...")
+    try:
+        resp = requests.get(url, headers=headers)
+        if resp.status_code == 200:
+            data = resp.json()
+            timestamp = datetime.now().isoformat()
+            for item in data:
+                item["realm"] = realm
+                item["faction"] = faction
+                item["auctionHouseId"] = auction_house_id
+                item["timestamp"] = timestamp
+                item["gold_min_buyout"] = (item.get("minBuyout") or 0) / 10000
+            return data
+        else:
+            print(f"Failed: {resp.status_code}")
+            return None
+    except Exception as e:
+        print(f"Connection Error: {e}")
+        return None
+
+def append_to_storage(data_list):
+    df = pd.DataFrame(data_list)
+    file_exists = os.path.isfile(MASTER_DATA_FILE)
+    df.to_csv(MASTER_DATA_FILE, mode='a', index=False, header=not file_exists)
+    print(f"Saved! File size: {os.path.getsize(MASTER_DATA_FILE) / 1024 / 1024:.2f} MB")
+
+def update_last_run_log(timestamp):
+    with open("last_run.txt", "w") as f:
+        f.write(timestamp)
+    print(f"Log updated: {timestamp}")
+
+# Inside your execution block, after append_to_storage(batch_data):
+timestamp_now = datetime.now().isoformat()
+update_last_run_log(timestamp_now)
+
+# --- EXECUTE SCRIPT---
+token = get_token()
+if token:
+    # 1. Get Regional Data first
+    regional_raw = scrape_region_data(token)
+    
+    if regional_raw:
+        # Create the lookup with the correct key names found in your debug print
+        region_lookup = {
+            int(item['itemId']): {
+                'regionMarketAvg': item.get('marketValue') or 0,
+                'regionHistorical': item.get('historical') or 0,
+                'regionSaleRate': item.get('saleRate') or 0,
+                'regionSoldPerDay': item.get('soldPerDay') or 0
+            } for item in regional_raw
+        }
+
+        batch_data = []
+        for ah_id, (realm, faction) in AUCTION_HOUSES.items():
+            ah_data = scrape_auction_house(token, ah_id, realm, faction)
+            
+            if ah_data:
+                for item in ah_data:
+                    # Match by Item ID
+                    l_item_id = int(item['itemId'])
+                    stats = region_lookup.get(l_item_id, {})
+                    
+                    # This "glues" the stats to your local AH item
+                    item.update(stats)
+                
+                batch_data.extend(ah_data)
+            time.sleep(2)
+
+        if batch_data:
+            append_to_storage(batch_data)
+
+            timestamp_now = datetime.now().isoformat()
+            update_last_run_log(timestamp_now)
+
+    else:
+        print("Failed to get regional data. Skipping this run.")
