@@ -1,0 +1,65 @@
+import time
+import subprocess
+import sys
+import os
+from datetime import datetime, timedelta
+
+# --- CONFIGURATION ---
+SCRAPER_FILE = "/home/catmanraspen/Documents/Programming/TSM_data/tsm_scraper.py"  # Ensure this matches your scraper's filename
+LOG_FILE = "/home/catmanraspen/Documents/Programming/TSM_data/last_run.txt"
+CHECK_INTERVAL_SECONDS = 600    # Check every 10 minutes (600 seconds)
+WAIT_MINUTES = 120                  # Your 2-hour rule
+
+def get_last_run_time():
+    """Reads the timestamp from the log file. Returns a very old date if file missing."""
+    if not os.path.exists(LOG_FILE):
+        # Return a date from the past so the scraper triggers immediately on first run
+        return datetime.now() - timedelta(days=1)
+    
+    try:
+        with open(LOG_FILE, "r") as f:
+            content = f.read().strip()
+            return datetime.fromisoformat(content)
+    except Exception as e:
+        print(f"Could not read log file: {e}")
+        print(f"Details: {e}")
+        return None # Signal that there is a problem
+
+def run_scraper():
+    """Launches the scraper script as a separate process."""
+    print(f"Triggering Scraper at {datetime.now().strftime('%H:%M:%S')}...")
+    try:
+        # This runs the scraper and waits for it to finish
+        subprocess.run([sys.executable, SCRAPER_FILE], check=True)
+        print("Scraper finished successfully.")
+    except subprocess.CalledProcessError as e:
+        print(f"Scraper crashed or failed: {e}")
+
+# --- MAIN LOOP ---
+print(f"Scraping Scheduler active. Monitoring {LOG_FILE} every {CHECK_INTERVAL_SECONDS/60} minutes.")
+
+while True:
+    last_run = get_last_run_time()
+
+    if last_run is None:
+        print(
+            "ERROR: The 'last_run.txt' file is corrupted or unreadable. "
+            "Please fix the file to resume market scraping."
+        )
+
+    else:
+        now = datetime.now()
+        time_diff = now - last_run
+        required_seconds = WAIT_MINUTES * 60
+
+        if time_diff.total_seconds() >= required_seconds:
+            run_scraper()
+        else:
+            # Calculate time remaining for the console log
+            remaining = timedelta(seconds=required_seconds) - time_diff
+            # Round seconds for cleaner display
+            rem_str = str(remaining).split('.')[0] 
+            print(f"{time_diff.total_seconds()/3600:.2f}h since last run. Next run in ~{rem_str}.")
+
+    # Wait before checking the log again
+    time.sleep(CHECK_INTERVAL_SECONDS)
