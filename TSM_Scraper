@@ -8,8 +8,11 @@ from datetime import datetime
 # --- CONFIGURATION ---
 MY_API_KEY = "INSERT API KEY HERE"
 CLIENT_ID = "INSERT CLIENT ID HERE"
-MASTER_DATA_FILE = "/home/catmanraspen/Documents/Programming/TSM_data/tbc_anniversary_market_history.csv"
+FILE_PATH = "C:\\Users\\Soren\\Documents\\Programming\\TSM_API_scraping\\"     #WINDOWS
+#FILE_PATH = "/home/catmanraspen/Documents/Programming/TSM_data/"               #LINUX
+MASTER_DATA_FILE = f"{FILE_PATH}tbc_anniversary_market_history.csv"
 REGION_ID = 26 # Anniversary EU Region
+GAME_VERSION = "anniversary"
 
 AUCTION_HOUSES = {
     559: ("Thunderstrike", "Alliance"),
@@ -76,12 +79,13 @@ def scrape_auction_house(token, auction_house_id, realm, faction):
 
 def append_to_storage(data_list):
     df = pd.DataFrame(data_list)
+    df["game_version"] = GAME_VERSION
     file_exists = os.path.isfile(MASTER_DATA_FILE)
     df.to_csv(MASTER_DATA_FILE, mode='a', index=False, header=not file_exists)
     print(f"Saved! File size: {os.path.getsize(MASTER_DATA_FILE) / 1024 / 1024:.2f} MB")
 
 def update_last_run_log(timestamp):
-    with open("/home/catmanraspen/Documents/Programming/TSM_data/last_run.txt", "w") as f:
+    with open(f"{FILE_PATH}last_run.txt", "w") as f:
         f.write(timestamp)
     print(f"Log updated: {timestamp}")
 
