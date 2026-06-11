@@ -8,7 +8,7 @@ from datetime import datetime
 # --- CONFIGURATION ---
 MY_API_KEY = "INSERT API KEY HERE"
 CLIENT_ID = "INSERT CLIENT ID HERE"
-MASTER_DATA_FILE = "tbc_anniversary_market_history.csv"
+MASTER_DATA_FILE = "/home/catmanraspen/Documents/Programming/TSM_data/tbc_anniversary_market_history.csv"
 REGION_ID = 26 # Anniversary EU Region
 
 AUCTION_HOUSES = {
@@ -81,7 +81,7 @@ def append_to_storage(data_list):
     print(f"Saved! File size: {os.path.getsize(MASTER_DATA_FILE) / 1024 / 1024:.2f} MB")
 
 def update_last_run_log(timestamp):
-    with open("last_run.txt", "w") as f:
+    with open("/home/catmanraspen/Documents/Programming/TSM_data/last_run.txt", "w") as f:
         f.write(timestamp)
     print(f"Log updated: {timestamp}")
 
