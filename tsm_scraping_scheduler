@@ -7,8 +7,8 @@ from datetime import datetime, timedelta
 # --- CONFIGURATION ---
 SCRAPER_FILE = "/home/catmanraspen/Documents/Programming/TSM_data/tsm_scraper.py"  # Ensure this matches your scraper's filename
 LOG_FILE = "/home/catmanraspen/Documents/Programming/TSM_data/last_run.txt"
-CHECK_INTERVAL_SECONDS = 600    # Check every 10 minutes (600 seconds)
-WAIT_MINUTES = 120                  # Your 2-hour rule
+CHECK_INTERVAL_SECONDS = 273    # Check every 10 minutes (600 seconds)
+WAIT_MINUTES = 59                  # Is set to 114 min instead, as this will rotate the time of day when data is collected.
 
 def get_last_run_time():
     """Reads the timestamp from the log file. Returns a very old date if file missing."""
